@@ -1,0 +1,284 @@
+{
+  "patterns": [
+    {
+      "id": 1,
+      "language": "dotnet",
+      "regex": "Session\\s*\\[",
+      "category": "Session State",
+      "severity": "high",
+      "remediation": "Use IDistributedCache with Redis backend. Configure in Startup.cs with services.AddStackExchangeRedisCache()"
+    },
+    {
+      "id": 2,
+      "language": "dotnet",
+      "regex": "HttpContext\\.Current\\.Session",
+      "category": "Session State",
+      "severity": "high",
+      "remediation": "Use IDistributedCache with session middleware in ASP.NET Core"
+    },
+    {
+      "id": 3,
+      "language": "dotnet",
+      "regex": "Application\\s*\\[",
+      "category": "Application State",
+      "severity": "high",
+      "remediation": "Move to appsettings.json and inject IConfiguration via dependency injection"
+    },
+    {
+      "id": 4,
+      "language": "dotnet",
+      "regex": "HttpContext\\.Current\\.Application",
+      "category": "Application State",
+      "severity": "high",
+      "remediation": "Use configuration system or distributed cache for shared application state"
+    },
+    {
+      "id": 5,
+      "language": "dotnet",
+      "regex": "ViewState\\s*\\[",
+      "category": "ViewState",
+      "severity": "medium",
+      "remediation": "Use client-side state management or POST model data explicitly. Consider migrating to Razor Pages or MVC"
+    },
+    {
+      "id": 6,
+      "language": "dotnet",
+      "regex": "ControlState\\s*\\[",
+      "category": "ControlState",
+      "severity": "medium",
+      "remediation": "Refactor Web Forms controls to stateless equivalents in modern frameworks"
+    },
+    {
+      "id": 7,
+      "language": "dotnet",
+      "regex": "private\\s+static(?!.*readonly).*=",
+      "category": "Static Mutable Field",
+      "severity": "high",
+      "remediation": "Use dependency injection with scoped/transient lifetime. For per-request state, use HttpContext.Items"
+    },
+    {
+      "id": 8,
+      "language": "dotnet",
+      "regex": "public\\s+static(?!.*readonly).*=",
+      "category": "Static Mutable Field",
+      "severity": "high",
+      "remediation": "Refactor to use dependency injection instead of static state"
+    },
+    {
+      "id": 9,
+      "language": "dotnet",
+      "regex": "MemoryCache\\.Default",
+      "category": "In-Process Cache",
+      "severity": "medium",
+      "remediation": "Replace with IDistributedCache using Redis, SQL Server, or NCache backend"
+    },
+    {
+      "id": 10,
+      "language": "dotnet",
+      "regex": "HttpRuntime\\.Cache",
+      "category": "In-Process Cache",
+      "severity": "medium",
+      "remediation": "Migrate to IDistributedCache in ASP.NET Core with external cache provider"
+    },
+    {
+      "id": 11,
+      "language": "dotnet",
+      "regex": "new\\s+MemoryCache\\(",
+      "category": "In-Process Cache",
+      "severity": "medium",
+      "remediation": "Use IDistributedCache interface with external backing store for horizontal scalability"
+    },
+    {
+      "id": 12,
+      "language": "dotnet",
+      "regex": "TempData\\[(?!.*Provider)",
+      "category": "TempData without Provider",
+      "severity": "medium",
+      "remediation": "Configure TempData with cookie-based provider or distributed cache using services.AddSessionStateTempDataProvider()"
+    },
+    {
+      "id": 13,
+      "language": "dotnet",
+      "regex": "HttpContext\\.Items\\[",
+      "category": "Per-Request State (OK if used correctly)",
+      "severity": "low",
+      "remediation": "This is acceptable for per-request state but verify it's not being used across requests"
+    },
+    {
+      "id": 14,
+      "language": "dotnet",
+      "regex": "Connection\\s+\\w+\\s*=.*new\\s+Connection",
+      "category": "Database Connection State",
+      "severity": "high",
+      "remediation": "Use dependency injection with IDbConnection and proper scoping. Avoid static connections"
+    },
+    {
+      "id": 15,
+      "language": "dotnet",
+      "regex": "static.*Connection",
+      "category": "Static DB Connection",
+      "severity": "high",
+      "remediation": "Use connection pooling with dependency injection instead of static connections"
+    },
+    {
+      "id": 16,
+      "language": "dotnet",
+      "regex": "FileStream.*static",
+      "category": "Static File Handle",
+      "severity": "medium",
+      "remediation": "Use using statements and avoid static file handles that persist across requests"
+    },
+    {
+      "id": 17,
+      "language": "dotnet",
+      "regex": "ConfigurationManager\\.AppSettings\\[",
+      "category": "Configuration State",
+      "severity": "medium",
+      "remediation": "Use IConfiguration with dependency injection in ASP.NET Core"
+    },
+    {
+      "id": 18,
+      "language": "dotnet",
+      "regex": "static.*EventHandler",
+      "category": "Static Event Handler",
+      "severity": "medium",
+      "remediation": "Use instance-based event handling or ensure proper cleanup to avoid memory leaks"
+    },
+    {
+      "id": 19,
+      "language": "java",
+      "regex": "\\.getSession\\s*\\(",
+      "category": "Session State",
+      "severity": "high",
+      "remediation": "Use Spring Session with Redis/JDBC backend or implement JWT-based stateless authentication"
+    },
+    {
+      "id": 20,
+      "language": "java",
+      "regex": "HttpSession",
+      "category": "Session State",
+      "severity": "high",
+      "remediation": "Refactor to stateless architecture. Use Spring Session with external store: @EnableRedisHttpSession"
+    },
+    {
+      "id": 21,
+      "language": "java",
+      "regex": "session\\.setAttribute",
+      "category": "Session State",
+      "severity": "high",
+      "remediation": "Move session data to JWT claims or distributed cache (Redis, Hazelcast)"
+    },
+    {
+      "id": 22,
+      "language": "java",
+      "regex": "getServletContext\\s*\\(\\s*\\)\\.setAttribute",
+      "category": "Application State",
+      "severity": "high",
+      "remediation": "Use Spring Cloud Config or external configuration service (Consul, etcd)"
+    },
+    {
+      "id": 23,
+      "language": "java",
+      "regex": "private\\s+static(?!.*final).*=",
+      "category": "Static Mutable Field",
+      "severity": "high",
+      "remediation": "Use Spring dependency injection with @Autowired and appropriate scope (@RequestScope, @SessionScope)"
+    },
+    {
+      "id": 24,
+      "language": "java",
+      "regex": "public\\s+static(?!.*final).*=",
+      "category": "Static Mutable Field",
+      "severity": "high",
+      "remediation": "Refactor to use dependency injection. Static mutable state breaks in clustered environments"
+    },
+    {
+      "id": 25,
+      "language": "java",
+      "regex": "ThreadLocal",
+      "category": "Thread-Local Storage",
+      "severity": "high",
+      "remediation": "Pass context explicitly through method parameters or use Spring request-scoped beans"
+    },
+    {
+      "id": 26,
+      "language": "java",
+      "regex": "@Singleton",
+      "category": "Singleton Pattern",
+      "severity": "medium",
+      "remediation": "Review singleton for mutable state. Consider @RequestScoped or @Prototype if state is stored"
+    },
+    {
+      "id": 27,
+      "language": "java",
+      "regex": "new\\s+ConcurrentHashMap.*=\\s*new\\s+ConcurrentHashMap",
+      "category": "In-Memory Collection",
+      "severity": "medium",
+      "remediation": "Replace with distributed cache (Redis, Hazelcast, Infinispan) for multi-instance deployments"
+    },
+    {
+      "id": 28,
+      "language": "java",
+      "regex": "CacheManager|Cache\\.put|EhCache",
+      "category": "In-Process Cache",
+      "severity": "medium",
+      "remediation": "Configure cache with distributed backend. For EhCache, use Terracotta. Consider migrating to Redis"
+    },
+    {
+      "id": 29,
+      "language": "java",
+      "regex": "@Cacheable(?!.*cacheManager)",
+      "category": "Spring Cache without Manager",
+      "severity": "medium",
+      "remediation": "Ensure cache manager uses distributed backend: @EnableCaching with RedisCacheManager"
+    },
+    {
+      "id": 30,
+      "language": "java",
+      "regex": "synchronized\\s*\\(",
+      "category": "Synchronized Block",
+      "severity": "low",
+      "remediation": "Synchronized blocks only work within a single JVM. Use distributed locks (Redis, ZooKeeper) for clusters"
+    },
+    {
+      "id": 31,
+      "language": "java",
+      "regex": "Connection\\s+\\w+\\s*=.*DriverManager\\.getConnection",
+      "category": "Database Connection State",
+      "severity": "high",
+      "remediation": "Use connection pooling with DataSource and dependency injection instead of direct connections"
+    },
+    {
+      "id": 32,
+      "language": "java",
+      "regex": "static.*Connection",
+      "category": "Static DB Connection",
+      "severity": "high",
+      "remediation": "Use @Autowired DataSource with proper connection management"
+    },
+    {
+      "id": 33,
+      "language": "java",
+      "regex": "System\\.getProperty.*static",
+      "category": "Configuration State",
+      "severity": "medium",
+      "remediation": "Use @Value annotation or @ConfigurationProperties for externalized configuration"
+    },
+    {
+      "id": 34,
+      "language": "java",
+      "regex": "static.*Lock|Mutex|Semaphore",
+      "category": "Static Synchronization",
+      "severity": "medium",
+      "remediation": "Use distributed locking mechanisms for multi-instance deployments"
+    },
+    {
+      "id": 35,
+      "language": "java",
+      "regex": "volatile(?!.*final)",
+      "category": "Mutable Volatile Field",
+      "severity": "medium",
+      "remediation": "Consider using AtomicReference or moving state to external store for cluster safety"
+    }
+  ]
+}

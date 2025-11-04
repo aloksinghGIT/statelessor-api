@@ -1,0 +1,462 @@
+{
+  "remediationActions": {
+    "1": {
+      "patternId": 1,
+      "category": "Session State",
+      "actions": [
+        {
+          "id": "INFRA_REDIS",
+          "description": "Provision and configure a distributed cache cluster (e.g., Redis)",
+          "actionCategory": "Infrastructure",
+          "impactType": "One-time",
+          "impactSeverity": "C",
+          "weight": 8,
+          "subActions": [
+            "Setup Redis cluster or managed service",
+            "Configure network security and access controls",
+            "Setup monitoring and alerting"
+          ]
+        },
+        {
+          "id": "DEP_CACHE_LIB",
+          "description": "Add distributed cache library dependency (StackExchange.Redis)",
+          "actionCategory": "Dependency & Setup",
+          "impactType": "One-time",
+          "impactSeverity": "S",
+          "weight": 2,
+          "subActions": [
+            "Add NuGet package reference",
+            "Update project dependencies"
+          ]
+        },
+        {
+          "id": "CODE_REMOVE_SESSION",
+          "description": "Remove Session[] usage and replace with IDistributedCache",
+          "actionCategory": "Code Refactoring",
+          "impactType": "Recurring",
+          "impactSeverity": "M",
+          "weight": 5,
+          "subActions": [
+            "Replace Session[] calls with cache.SetStringAsync()",
+            "Handle serialization/deserialization",
+            "Convert to async/await pattern"
+          ]
+        },
+        {
+          "id": "CONFIG_CACHE",
+          "description": "Configure distributed cache in Startup.cs",
+          "actionCategory": "Configuration",
+          "impactType": "One-time",
+          "impactSeverity": "S",
+          "weight": 3,
+          "subActions": [
+            "Add services.AddStackExchangeRedisCache()",
+            "Configure connection string",
+            "Setup cache options"
+          ]
+        },
+        {
+          "id": "TEST_CACHE",
+          "description": "Write unit and integration tests for cache operations",
+          "actionCategory": "Testing",
+          "impactType": "One-time",
+          "impactSeverity": "C",
+          "weight": 7,
+          "subActions": [
+            "Mock IDistributedCache for unit tests",
+            "Create integration tests with Redis",
+            "Test cache expiration scenarios"
+          ]
+        }
+      ],
+      "totalEffort": 25
+    },
+    "2": {
+      "patternId": 2,
+      "category": "Session State",
+      "actions": [
+        {
+          "id": "INFRA_REDIS",
+          "description": "Provision and configure a distributed cache cluster (e.g., Redis)",
+          "actionCategory": "Infrastructure",
+          "impactType": "One-time",
+          "impactSeverity": "C",
+          "weight": 8
+        },
+        {
+          "id": "DEP_SESSION_MIDDLEWARE",
+          "description": "Add ASP.NET Core session middleware dependencies",
+          "actionCategory": "Dependency & Setup",
+          "impactType": "One-time",
+          "impactSeverity": "S",
+          "weight": 2
+        },
+        {
+          "id": "CODE_REPLACE_HTTPSESSION",
+          "description": "Replace HttpContext.Current.Session with IDistributedCache",
+          "actionCategory": "Code Refactoring",
+          "impactType": "Recurring",
+          "impactSeverity": "M",
+          "weight": 5
+        },
+        {
+          "id": "CONFIG_SESSION_MIDDLEWARE",
+          "description": "Configure session middleware with distributed provider",
+          "actionCategory": "Configuration",
+          "impactType": "One-time",
+          "impactSeverity": "M",
+          "weight": 4
+        }
+      ],
+      "totalEffort": 19
+    },
+    "7": {
+      "patternId": 7,
+      "category": "Static Mutable Field",
+      "actions": [
+        {
+          "id": "CODE_REMOVE_STATIC",
+          "description": "Remove static mutable field declaration",
+          "actionCategory": "Code Refactoring",
+          "impactType": "Recurring",
+          "impactSeverity": "S",
+          "weight": 1,
+          "subActions": [
+            "Delete static field declaration",
+            "Remove static initializers"
+          ]
+        },
+        {
+          "id": "CODE_INJECT_DI",
+          "description": "Inject dependency via constructor using DI container",
+          "actionCategory": "Code Refactoring",
+          "impactType": "Recurring",
+          "impactSeverity": "M",
+          "weight": 4,
+          "subActions": [
+            "Add constructor parameter",
+            "Register service in DI container",
+            "Update calling code"
+          ]
+        },
+        {
+          "id": "CODE_REPLACE_USAGE",
+          "description": "Replace static field usage with injected dependency",
+          "actionCategory": "Code Refactoring",
+          "impactType": "Recurring",
+          "impactSeverity": "M",
+          "weight": 3,
+          "subActions": [
+            "Update all field references",
+            "Handle scope differences",
+            "Ensure thread safety"
+          ]
+        },
+        {
+          "id": "CONFIG_DI_SCOPE",
+          "description": "Configure appropriate DI scope (Scoped/Transient)",
+          "actionCategory": "Configuration",
+          "impactType": "One-time",
+          "impactSeverity": "S",
+          "weight": 2
+        }
+      ],
+      "totalEffort": 10
+    },
+    "9": {
+      "patternId": 9,
+      "category": "In-Process Cache",
+      "actions": [
+        {
+          "id": "INFRA_REDIS",
+          "description": "Provision and configure a distributed cache cluster (e.g., Redis)",
+          "actionCategory": "Infrastructure",
+          "impactType": "One-time",
+          "impactSeverity": "C",
+          "weight": 8
+        },
+        {
+          "id": "DEP_CACHE_LIB",
+          "description": "Add distributed cache library dependency",
+          "actionCategory": "Dependency & Setup",
+          "impactType": "One-time",
+          "impactSeverity": "S",
+          "weight": 2
+        },
+        {
+          "id": "CODE_REPLACE_MEMORYCACHE",
+          "description": "Replace MemoryCache.Default with IDistributedCache",
+          "actionCategory": "Code Refactoring",
+          "impactType": "Recurring",
+          "impactSeverity": "M",
+          "weight": 5,
+          "subActions": [
+            "Replace MemoryCache calls",
+            "Handle async operations",
+            "Implement serialization"
+          ]
+        },
+        {
+          "id": "CONFIG_CACHE",
+          "description": "Configure distributed cache provider",
+          "actionCategory": "Configuration",
+          "impactType": "One-time",
+          "impactSeverity": "S",
+          "weight": 3
+        }
+      ],
+      "totalEffort": 18
+    },
+    "19": {
+      "patternId": 19,
+      "category": "Session State",
+      "actions": [
+        {
+          "id": "INFRA_REDIS",
+          "description": "Provision and configure a distributed cache cluster (e.g., Redis)",
+          "actionCategory": "Infrastructure",
+          "impactType": "One-time",
+          "impactSeverity": "C",
+          "weight": 8
+        },
+        {
+          "id": "DEP_SPRING_SESSION",
+          "description": "Add Spring Session Redis dependency",
+          "actionCategory": "Dependency & Setup",
+          "impactType": "One-time",
+          "impactSeverity": "S",
+          "weight": 2,
+          "subActions": [
+            "Add spring-session-data-redis dependency",
+            "Update Maven/Gradle configuration"
+          ]
+        },
+        {
+          "id": "CODE_REPLACE_GETSESSION",
+          "description": "Replace getSession() calls with Spring Session or JWT",
+          "actionCategory": "Code Refactoring",
+          "impactType": "Recurring",
+          "impactSeverity": "M",
+          "weight": 6,
+          "subActions": [
+            "Remove HttpServletRequest.getSession() calls",
+            "Implement JWT token handling",
+            "Update authentication flow"
+          ]
+        },
+        {
+          "id": "CONFIG_SPRING_SESSION",
+          "description": "Configure Spring Session with Redis backend",
+          "actionCategory": "Configuration",
+          "impactType": "One-time",
+          "impactSeverity": "M",
+          "weight": 4,
+          "subActions": [
+            "Add @EnableRedisHttpSession annotation",
+            "Configure Redis connection properties",
+            "Setup session serialization"
+          ]
+        },
+        {
+          "id": "AUTH_JWT_IMPL",
+          "description": "Implement JWT-based stateless authentication",
+          "actionCategory": "Code Refactoring",
+          "impactType": "One-time",
+          "impactSeverity": "C",
+          "weight": 10,
+          "subActions": [
+            "Add JWT library dependency",
+            "Implement token generation/validation",
+            "Update security configuration",
+            "Modify client-side authentication"
+          ]
+        }
+      ],
+      "totalEffort": 30
+    },
+    "23": {
+      "patternId": 23,
+      "category": "Static Mutable Field",
+      "actions": [
+        {
+          "id": "CODE_REMOVE_STATIC_JAVA",
+          "description": "Remove private static mutable field",
+          "actionCategory": "Code Refactoring",
+          "impactType": "Recurring",
+          "impactSeverity": "S",
+          "weight": 1
+        },
+        {
+          "id": "CODE_SPRING_DI",
+          "description": "Implement Spring dependency injection with @Autowired",
+          "actionCategory": "Code Refactoring",
+          "impactType": "Recurring",
+          "impactSeverity": "M",
+          "weight": 4,
+          "subActions": [
+            "Add @Autowired annotation",
+            "Create service/component class",
+            "Configure appropriate scope (@RequestScope, @SessionScope)"
+          ]
+        },
+        {
+          "id": "CONFIG_SPRING_SCOPE",
+          "description": "Configure Spring bean scope appropriately",
+          "actionCategory": "Configuration",
+          "impactType": "One-time",
+          "impactSeverity": "S",
+          "weight": 2
+        }
+      ],
+      "totalEffort": 7
+    },
+    "25": {
+      "patternId": 25,
+      "category": "Thread-Local Storage",
+      "actions": [
+        {
+          "id": "CODE_REMOVE_THREADLOCAL",
+          "description": "Remove ThreadLocal usage",
+          "actionCategory": "Code Refactoring",
+          "impactType": "Recurring",
+          "impactSeverity": "M",
+          "weight": 3
+        },
+        {
+          "id": "CODE_EXPLICIT_CONTEXT",
+          "description": "Pass context explicitly through method parameters",
+          "actionCategory": "Code Refactoring",
+          "impactType": "Recurring",
+          "impactSeverity": "M",
+          "weight": 5,
+          "subActions": [
+            "Add context parameters to method signatures",
+            "Update all method calls",
+            "Refactor method chains"
+          ]
+        },
+        {
+          "id": "CODE_REQUEST_SCOPE",
+          "description": "Use Spring request-scoped beans as alternative",
+          "actionCategory": "Code Refactoring",
+          "impactType": "Recurring",
+          "impactSeverity": "M",
+          "weight": 4,
+          "subActions": [
+            "Create @RequestScoped bean",
+            "Inject bean where needed",
+            "Update context handling"
+          ]
+        }
+      ],
+      "totalEffort": 12
+    },
+    "28": {
+      "patternId": 28,
+      "category": "In-Process Cache",
+      "actions": [
+        {
+          "id": "INFRA_REDIS",
+          "description": "Provision and configure a distributed cache cluster (e.g., Redis)",
+          "actionCategory": "Infrastructure",
+          "impactType": "One-time",
+          "impactSeverity": "C",
+          "weight": 8
+        },
+        {
+          "id": "DEP_SPRING_CACHE",
+          "description": "Add Spring Data Redis dependency",
+          "actionCategory": "Dependency & Setup",
+          "impactType": "One-time",
+          "impactSeverity": "S",
+          "weight": 2
+        },
+        {
+          "id": "CODE_REPLACE_CACHE_MANAGER",
+          "description": "Replace EhCache/CacheManager with Redis-backed cache",
+          "actionCategory": "Code Refactoring",
+          "impactType": "Recurring",
+          "impactSeverity": "M",
+          "weight": 6,
+          "subActions": [
+            "Replace cache.put() calls",
+            "Update cache configuration",
+            "Handle serialization differences"
+          ]
+        },
+        {
+          "id": "CONFIG_REDIS_CACHE",
+          "description": "Configure Redis as cache backend",
+          "actionCategory": "Configuration",
+          "impactType": "One-time",
+          "impactSeverity": "M",
+          "weight": 4,
+          "subActions": [
+            "Configure RedisCacheManager",
+            "Setup cache serialization",
+            "Configure TTL policies"
+          ]
+        }
+      ],
+      "totalEffort": 20
+    }
+  },
+  "actionLibrary": {
+    "INFRA_REDIS": {
+      "description": "Provision and configure a distributed cache cluster (e.g., Redis)",
+      "category": "Infrastructure",
+      "baseWeight": 8,
+      "impactType": "One-time",
+      "impactSeverity": "C"
+    },
+    "DEP_CACHE_LIB": {
+      "description": "Add distributed cache library dependency",
+      "category": "Dependency & Setup", 
+      "baseWeight": 2,
+      "impactType": "One-time",
+      "impactSeverity": "S"
+    },
+    "CODE_REMOVE_SESSION": {
+      "description": "Remove session state usage",
+      "category": "Code Refactoring",
+      "baseWeight": 5,
+      "impactType": "Recurring",
+      "impactSeverity": "M"
+    },
+    "CODE_REMOVE_STATIC": {
+      "description": "Remove static mutable field",
+      "category": "Code Refactoring",
+      "baseWeight": 1,
+      "impactType": "Recurring", 
+      "impactSeverity": "S"
+    },
+    "CODE_INJECT_DI": {
+      "description": "Implement dependency injection",
+      "category": "Code Refactoring",
+      "baseWeight": 4,
+      "impactType": "Recurring",
+      "impactSeverity": "M"
+    },
+    "CONFIG_CACHE": {
+      "description": "Configure distributed cache",
+      "category": "Configuration",
+      "baseWeight": 3,
+      "impactType": "One-time",
+      "impactSeverity": "S"
+    },
+    "TEST_CACHE": {
+      "description": "Write cache-related tests",
+      "category": "Testing",
+      "baseWeight": 7,
+      "impactType": "One-time",
+      "impactSeverity": "C"
+    },
+    "AUTH_JWT_IMPL": {
+      "description": "Implement JWT-based authentication",
+      "category": "Code Refactoring",
+      "baseWeight": 10,
+      "impactType": "One-time",
+      "impactSeverity": "C"
+    }
+  }
+}
