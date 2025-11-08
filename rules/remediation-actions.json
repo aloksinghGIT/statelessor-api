@@ -351,6 +351,52 @@
       ],
       "totalEffort": 12
     },
+    "12": {
+      "patternId": 12,
+      "category": "TempData without Provider",
+      "actions": [
+        {
+          "id": "CONFIG_TEMPDATA_PROVIDER",
+          "description": "Configure TempData with cookie-based or session provider",
+          "actionCategory": "Configuration",
+          "impactType": "One-time",
+          "impactSeverity": "S",
+          "weight": 3,
+          "subActions": [
+            "Add services.AddSessionStateTempDataProvider() in Startup.cs",
+            "Configure cookie options for TempData",
+            "Set TempData serialization options"
+          ]
+        },
+        {
+          "id": "CODE_VERIFY_TEMPDATA",
+          "description": "Verify TempData usage patterns are correct",
+          "actionCategory": "Code Refactoring",
+          "impactType": "Recurring",
+          "impactSeverity": "S",
+          "weight": 2,
+          "subActions": [
+            "Ensure TempData is only used for redirect scenarios",
+            "Verify data is consumed after redirect",
+            "Check for proper error handling"
+          ]
+        },
+        {
+          "id": "TEST_TEMPDATA_FLOW",
+          "description": "Test TempData persistence across redirects",
+          "actionCategory": "Testing",
+          "impactType": "One-time",
+          "impactSeverity": "S",
+          "weight": 2,
+          "subActions": [
+            "Create integration tests for redirect scenarios",
+            "Test TempData with different providers",
+            "Verify data cleanup after consumption"
+          ]
+        }
+      ],
+      "totalEffort": 7
+    },
     "28": {
       "patternId": 28,
       "category": "In-Process Cache",
@@ -457,6 +503,27 @@
       "baseWeight": 10,
       "impactType": "One-time",
       "impactSeverity": "C"
+    },
+    "CONFIG_TEMPDATA_PROVIDER": {
+      "description": "Configure TempData provider",
+      "category": "Configuration",
+      "baseWeight": 3,
+      "impactType": "One-time",
+      "impactSeverity": "S"
+    },
+    "CODE_VERIFY_TEMPDATA": {
+      "description": "Verify TempData usage patterns",
+      "category": "Code Refactoring",
+      "baseWeight": 2,
+      "impactType": "Recurring",
+      "impactSeverity": "S"
+    },
+    "TEST_TEMPDATA_FLOW": {
+      "description": "Test TempData functionality",
+      "category": "Testing",
+      "baseWeight": 2,
+      "impactType": "One-time",
+      "impactSeverity": "S"
     }
   }
 }

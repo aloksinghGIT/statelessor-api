@@ -3,7 +3,8 @@ const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsPromises = require('fs').promises;
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const unzipper = require('unzipper');
@@ -33,11 +34,12 @@ setInterval(() => {
   }
 }, 60 * 60 * 1000);
 
-// Configure multer for file uploads
+// Configure multer for file uploads with session isolation
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
-    const uploadDir = path.join(__dirname, 'uploads', Date.now().toString());
-    await fs.mkdir(uploadDir, { recursive: true });
+    const requestId = req.headers['x-request-id'] || crypto.randomUUID();
+    const uploadDir = path.join(__dirname, 'uploads', `${Date.now()}-${requestId}`);
+    await fsPromises.mkdir(uploadDir, { recursive: true });
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
@@ -53,6 +55,14 @@ const upload = multer({
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+// Request ID middleware for session isolation
+app.use((req, res, next) => {
+  const requestId = req.headers['x-request-id'] || crypto.randomUUID();
+  req.requestId = requestId;
+  logger.log(`Processing request with ID: ${requestId}`);
+  next();
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', version: '1.0.0' });
@@ -61,9 +71,17 @@ app.get('/health', (req, res) => {
 // Script Generation APIs
 app.get('/api/script/bash', async (req, res) => {
   try {
+    if (!req.requestId) {
+      return res.status(400).json({
+        success: false,
+        error: 'X-Request-ID header is required',
+        code: 'MISSING_REQUEST_ID'
+      });
+    }
+    
     const generator = new ScriptGenerator();
     const rules = await generator.loadRules();
-    const script = generator.generateBashScript(rules);
+    const script = await generator.generateBashScript(rules, req.requestId);
     
     await logger.logScriptDownload('bash', req.get('User-Agent'), req.ip);
     
@@ -84,9 +102,17 @@ app.get('/api/script/bash', async (req, res) => {
 
 app.get('/api/script/powershell', async (req, res) => {
   try {
+    if (!req.requestId) {
+      return res.status(400).json({
+        success: false,
+        error: 'X-Request-ID header is required',
+        code: 'MISSING_REQUEST_ID'
+      });
+    }
+    
     const generator = new ScriptGenerator();
     const rules = await generator.loadRules();
-    const script = generator.generatePowerShellScript(rules);
+    const script = await generator.generatePowerShellScript(rules, req.requestId);
     
     await logger.logScriptDownload('powershell', req.get('User-Agent'), req.ip);
     
@@ -184,47 +210,73 @@ app.get('/findings/:projectName', async (req, res) => {
 // Main analysis endpoint
 app.post('/analyze', upload.single('zipFile'), async (req, res) => {
   let workingDir = null;
+  let projectName = 'unknown';
   
   try {
-    const { type, gitUrl, jsonData } = req.body;
-    let projectName = 'unknown';
+    const { type, gitUrl, jsonData, keyId } = req.body;
     
     if (type === 'json') {
       // Process pre-analyzed JSON from local script
       const data = JSON.parse(jsonData);
       projectName = data.projectName || 'uploaded-json';
+      const sessionProjectName = `${projectName}-${req.requestId.substring(0, 8)}`;
       
-      await logger.logSourceUpload(projectName, 'json', 'success', `JSON upload with ${data.findings?.length || 0} findings`);
+      await logger.logSourceUpload(sessionProjectName, 'json', 'success', `JSON upload with ${data.findings?.length || 0} findings`);
       
-      const tracker = new CSVTracker(projectName);
+      const tracker = new CSVTracker(sessionProjectName);
       await tracker.addFindings(data.findings);
       
       const engine = new AnalysisEngine();
       const complexityFactor = engine.calculateComplexityFactor(data.findings, data.projectType || 'unknown');
-      const actionReport = await engine.generateActionReport(data.findings, projectName, complexityFactor);
+      const actionReport = await engine.generateActionReport(data.findings, sessionProjectName, complexityFactor);
       const enrichedResults = await engine.enrichFindings(data, complexityFactor);
       
       return res.json({
         ...enrichedResults,
+        sessionId: req.requestId,
         actions: actionReport
       });
     }
     
     if (type === 'git') {
-      // Clone git repository
-      workingDir = path.join(__dirname, 'temp', Date.now().toString());
-      await fs.mkdir(workingDir, { recursive: true });
+      // Clone git repository with session isolation
+      workingDir = path.join(__dirname, 'temp', `${Date.now()}-${req.requestId}`);
+      await fsPromises.mkdir(workingDir, { recursive: true });
       
       projectName = gitUrl.split('/').pop().replace('.git', '');
       logger.log(`Cloning repository: ${gitUrl}`);
-      await execAsync(`git clone --depth 1 ${gitUrl} ${workingDir}`);
+      
+      // Handle SSH vs HTTPS URLs
+      if (gitUrl.startsWith('git@')) {
+        // Try public access first, then fall back to SSH key if needed
+        try {
+          await execAsync(`git clone --depth 1 ${gitUrl} ${workingDir}`);
+        } catch (publicError) {
+          // Public access failed, try with SSH key
+          if (!keyId || !sshKeys.has(keyId)) {
+            return res.status(400).json({ 
+              error: 'Private repository requires SSH key. Generate a key first using /api/ssh/generate',
+              code: 'SSH_KEY_REQUIRED'
+            });
+          }
+          
+          const keyData = sshKeys.get(keyId);
+          const keyPath = path.join(workingDir, 'ssh_key');
+          await fsPromises.writeFile(keyPath, keyData.privateKey, { mode: 0o600 });
+          
+          await execAsync(`GIT_SSH_COMMAND="ssh -i ${keyPath} -o StrictHostKeyChecking=no" git clone --depth 1 ${gitUrl} ${workingDir}/repo`);
+          workingDir = path.join(workingDir, 'repo');
+        }
+      } else {
+        await execAsync(`git clone --depth 1 ${gitUrl} ${workingDir}`);
+      }
       
       await logger.logSourceUpload(projectName, 'git', 'success', `Cloned from ${gitUrl}`);
       
     } else if (type === 'zip' && req.file) {
-      // Extract uploaded zip
-      workingDir = path.join(__dirname, 'temp', Date.now().toString());
-      await fs.mkdir(workingDir, { recursive: true });
+      // Extract uploaded zip with session isolation
+      workingDir = path.join(__dirname, 'temp', `${Date.now()}-${req.requestId}`);
+      await fsPromises.mkdir(workingDir, { recursive: true });
       
       projectName = path.basename(req.file.originalname, '.zip');
       logger.log(`Extracting zip: ${req.file.path}`);
@@ -252,23 +304,26 @@ app.post('/analyze', upload.single('zipFile'), async (req, res) => {
       return res.status(400).json({ error: 'Unsupported project type' });
     }
     
-    // Track findings in CSV
-    const tracker = new CSVTracker(projectName);
+    // Track findings in CSV with session isolation
+    const sessionProjectName = `${projectName}-${req.requestId.substring(0, 8)}`;
+    const tracker = new CSVTracker(sessionProjectName);
     await tracker.addFindings(findings);
     
     // Calculate complexity and generate reports
     const complexityFactor = engine.calculateComplexityFactor(findings, projectType);
-    const actionReport = await engine.generateActionReport(findings, projectName, complexityFactor);
+    const actionReport = await engine.generateActionReport(findings, sessionProjectName, complexityFactor);
     const result = engine.generateSummaryAndDetails(findings, complexityFactor);
     
     // Clean up
     await cleanup(workingDir);
     if (req.file) {
-      await fs.unlink(req.file.path).catch(() => {});
+      await fsPromises.unlink(req.file.path).catch(() => {});
+      await fsPromises.rmdir(path.dirname(req.file.path)).catch(() => {});
     }
     
     res.json({
       projectName,
+      sessionId: req.requestId,
       projectType,
       scanDate: new Date().toISOString(),
       complexityFactor,
@@ -290,7 +345,8 @@ app.post('/analyze', upload.single('zipFile'), async (req, res) => {
       await cleanup(workingDir);
     }
     if (req.file) {
-      await fs.unlink(req.file.path).catch(() => {});
+      await fsPromises.unlink(req.file.path).catch(() => {});
+      await fsPromises.rmdir(path.dirname(req.file.path)).catch(() => {});
     }
     
     res.status(500).json({ 
@@ -313,7 +369,7 @@ function convertToSSHFormat(pemPublicKey) {
 // Clean up temporary directories
 async function cleanup(dir) {
   try {
-    await fs.rm(dir, { recursive: true, force: true });
+    await fsPromises.rm(dir, { recursive: true, force: true });
   } catch (error) {
     logger.error('Cleanup error', error, { dir });
   }

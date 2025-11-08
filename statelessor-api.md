@@ -8,6 +8,23 @@ http://localhost:3001
 ## Authentication
 No authentication required for current version.
 
+## Request ID Header (Required for Concurrency)
+All requests should include a unique `X-Request-ID` header to ensure session isolation:
+
+```javascript
+const requestId = crypto.randomUUID();
+fetch('/analyze', {
+  method: 'POST',
+  headers: {
+    'X-Request-ID': requestId,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({...})
+});
+```
+
+**Why Required**: Prevents data collision when multiple users analyze projects with same names simultaneously.
+
 ---
 
 ## API Endpoints
@@ -93,12 +110,35 @@ No authentication required for current version.
 #### Input Types:
 
 ##### A. Git Repository Analysis
+
+**Public Repository (HTTPS or SSH URL)**
 ```json
 {
   "type": "git",
   "gitUrl": "https://github.com/user/repo.git"
 }
 ```
+```json
+{
+  "type": "git",
+  "gitUrl": "git@github.com:user/repo.git"
+}
+```
+
+**Private Repository (SSH URL with Key)**
+```json
+{
+  "type": "git",
+  "gitUrl": "git@github.com:user/private-repo.git",
+  "keyId": "uuid-from-ssh-generate-endpoint"
+}
+```
+
+**Client Requirements:**
+- **Public repos**: Can use HTTPS or SSH URLs without `keyId`
+- **Private repos**: Must use SSH URLs with valid `keyId` from `/api/ssh/generate`
+- **SSH URLs without keyId**: Backend attempts public access first, falls back to error if private
+- **Invalid keyId**: Returns 400 error with code `SSH_KEY_REQUIRED`
 
 ##### B. ZIP File Upload
 ```
@@ -123,6 +163,7 @@ Content-Type: multipart/form-data
 ```json
 {
   "projectName": "my-project",
+  "sessionId": "uuid-v4-identifier",
   "projectType": "dotnet|java",
   "scanDate": "2024-01-01T12:00:00Z",
   "complexityFactor": 1.3,
@@ -265,30 +306,92 @@ Content-Type: multipart/form-data
 
 ### React Fetch Examples
 
-#### 1. Analyze Git Repository
+#### 1. Analyze Public Git Repository
 ```javascript
-const analyzeGitRepo = async (gitUrl) => {
+const analyzePublicRepo = async (gitUrl) => {
+  const requestId = crypto.randomUUID();
   const response = await fetch('/analyze', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-Request-ID': requestId
+    },
     body: JSON.stringify({
       type: 'git',
-      gitUrl: gitUrl
+      gitUrl: gitUrl // HTTPS or SSH URL
     })
   });
   return await response.json();
 };
 ```
 
+#### 1b. Analyze Private Git Repository
+```javascript
+const analyzePrivateRepo = async (gitUrl, keyId) => {
+  const requestId = crypto.randomUUID();
+  const response = await fetch('/analyze', {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-Request-ID': requestId
+    },
+    body: JSON.stringify({
+      type: 'git',
+      gitUrl: gitUrl, // Must be SSH URL
+      keyId: keyId    // From /api/ssh/generate
+    })
+  });
+  return await response.json();
+};
+```
+
+#### 1c. Complete Git Analysis Flow
+```javascript
+const analyzeGitRepo = async (gitUrl, isPrivate = false, keyId = null) => {
+  const requestId = crypto.randomUUID();
+  const payload = {
+    type: 'git',
+    gitUrl: gitUrl
+  };
+  
+  // Add keyId for private repositories
+  if (isPrivate && keyId) {
+    payload.keyId = keyId;
+  }
+  
+  const response = await fetch('/analyze', {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-Request-ID': requestId
+    },
+    body: JSON.stringify(payload)
+  });
+  
+  const result = await response.json();
+  
+  // Handle SSH key requirement error
+  if (result.code === 'SSH_KEY_REQUIRED') {
+    throw new Error('Private repository requires SSH key generation');
+  }
+  
+  return result;
+};
+```
+
 #### 2. Upload ZIP File
 ```javascript
 const analyzeZipFile = async (file) => {
+  const requestId = crypto.randomUUID();
   const formData = new FormData();
   formData.append('zipFile', file);
   formData.append('type', 'zip');
   
   const response = await fetch('/analyze', {
     method: 'POST',
+    headers: {
+      'X-Request-ID': requestId
+    },
     body: formData
   });
   return await response.json();
@@ -298,9 +401,13 @@ const analyzeZipFile = async (file) => {
 #### 3. Upload Pre-analyzed JSON
 ```javascript
 const uploadAnalysisJson = async (jsonData) => {
+  const requestId = crypto.randomUUID();
   const response = await fetch('/analyze', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'X-Request-ID': requestId
+    },
     body: JSON.stringify({
       type: 'json',
       jsonData: JSON.stringify(jsonData)
@@ -310,10 +417,43 @@ const uploadAnalysisJson = async (jsonData) => {
 };
 ```
 
-#### 4. Download Analysis Script
+#### 4. Generate SSH Key for Private Repos
+```javascript
+const generateSSHKey = async () => {
+  const requestId = crypto.randomUUID();
+  const response = await fetch('/api/ssh/generate', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Request-ID': requestId
+    },
+    body: JSON.stringify({})
+  });
+  
+  const result = await response.json();
+  
+  if (result.success) {
+    // Display publicKey to user for adding to Git repository
+    console.log('Add this public key to your Git repository:');
+    console.log(result.publicKey);
+    
+    // Store keyId for later use in /analyze
+    return result.keyId;
+  }
+  
+  throw new Error(result.error);
+};
+```
+
+#### 5. Download Analysis Script
 ```javascript
 const downloadScript = async (scriptType) => {
-  const response = await fetch(`/api/script/${scriptType}`);
+  const requestId = crypto.randomUUID();
+  const response = await fetch(`/api/script/${scriptType}`, {
+    headers: {
+      'X-Request-ID': requestId
+    }
+  });
   const blob = await response.blob();
   
   // Create download link
@@ -353,5 +493,17 @@ All endpoints return appropriate HTTP status codes:
 - `200`: Success
 - `400`: Bad request (invalid parameters)
 - `500`: Server error
+
+### Common Error Codes:
+- `SSH_KEY_REQUIRED`: Private repository needs SSH key (use `/api/ssh/generate`)
+- `MISSING_REQUEST_ID`: X-Request-ID header is required
+- `SCRIPT_GENERATION_FAILED`: Script template processing failed
+- `KEY_GENERATION_FAILED`: SSH key pair generation failed
+
+### Git Repository Error Scenarios:
+1. **SSH URL without keyId on private repo**: Returns `SSH_KEY_REQUIRED`
+2. **Invalid or expired keyId**: Returns `SSH_KEY_REQUIRED`
+3. **Network/Git errors**: Returns 500 with git error message
+4. **Unsupported project type**: Returns 400 with project type error
 
 Always check response structure and handle both success and error cases in your frontend code.
