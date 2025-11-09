@@ -1221,6 +1221,362 @@ npm test -- --coverage
 npm test -- tests/tools/analyze-git.test.js
 ```
 
+**Step 5.6: Manual Testing (Before Deployment)**
+
+### Option 1: Test with MCP Inspector (Recommended)
+
+The MCP Inspector is a visual tool for testing MCP servers:
+
+```bash
+# Install MCP Inspector globally
+npm install -g @modelcontextprotocol/inspector
+
+# Start your Statelessor API (in another terminal)
+cd ../statelessor-api
+node server.js
+
+# Run MCP Inspector with your server
+cd statelessor-mcp
+mcp-inspector node mcp-server.js
+```
+
+This opens a web UI where you can:
+- See all available tools
+- Test each tool with custom inputs
+- View request/response in real-time
+- Debug errors visually
+
+### Option 2: Test with Direct Node.js Script
+
+Create `test-manual.js` for quick manual testing:
+
+```javascript
+#!/usr/bin/env node
+
+const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
+const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio.js');
+const { spawn } = require('child_process');
+
+async function testMCPServer() {
+  console.log('Starting MCP server test...\n');
+
+  // Start MCP server as child process
+  const serverProcess = spawn('node', ['mcp-server.js'], {
+    stdio: ['pipe', 'pipe', 'inherit'],
+  });
+
+  // Create client
+  const transport = new StdioClientTransport({
+    command: 'node',
+    args: ['mcp-server.js'],
+  });
+
+  const client = new Client(
+    {
+      name: 'test-client',
+      version: '1.0.0',
+    },
+    {
+      capabilities: {},
+    }
+  );
+
+  try {
+    await client.connect(transport);
+    console.log('✅ Connected to MCP server\n');
+
+    // Test 1: List available tools
+    console.log('Test 1: Listing available tools...');
+    const toolsList = await client.request(
+      { method: 'tools/list' },
+      { timeout: 5000 }
+    );
+    console.log(`✅ Found ${toolsList.tools.length} tools:`);
+    toolsList.tools.forEach((tool) => {
+      console.log(`   - ${tool.name}`);
+    });
+    console.log();
+
+    // Test 2: Generate bash script
+    console.log('Test 2: Generating bash script...');
+    const scriptResult = await client.request(
+      {
+        method: 'tools/call',
+        params: {
+          name: 'generate_analysis_script',
+          arguments: { scriptType: 'bash' },
+        },
+      },
+      { timeout: 10000 }
+    );
+    console.log('✅ Script generated successfully');
+    console.log(`   Length: ${scriptResult.content[0].text.length} characters\n`);
+
+    // Test 3: Explain remediation
+    console.log('Test 3: Explaining Session State remediation...');
+    const remediationResult = await client.request(
+      {
+        method: 'tools/call',
+        params: {
+          name: 'explain_remediation',
+          arguments: { category: 'Session State' },
+        },
+      },
+      { timeout: 10000 }
+    );
+    console.log('✅ Remediation guidance retrieved');
+    console.log(`   ${remediationResult.content[0].text.substring(0, 100)}...\n`);
+
+    // Test 4: Analyze Git repository (if API is running)
+    console.log('Test 4: Testing Git analysis (requires API)...');
+    try {
+      const gitResult = await client.request(
+        {
+          method: 'tools/call',
+          params: {
+            name: 'analyze_git_repository',
+            arguments: {
+              gitUrl: 'https://github.com/test/sample-repo',
+            },
+          },
+        },
+        { timeout: 60000 }
+      );
+      console.log('✅ Git analysis completed');
+    } catch (error) {
+      console.log('⚠️  Git analysis failed (API may not be running)');
+      console.log(`   Error: ${error.message}\n`);
+    }
+
+    console.log('\n✅ All manual tests completed!');
+  } catch (error) {
+    console.error('❌ Test failed:', error.message);
+    process.exit(1);
+  } finally {
+    await client.close();
+    serverProcess.kill();
+  }
+}
+
+testMCPServer().catch(console.error);
+```
+
+**Run manual test:**
+
+```bash
+# Make executable
+chmod +x test-manual.js
+
+# Run test
+node test-manual.js
+```
+
+### Option 3: Test Individual Tools Directly
+
+Create `test-tool.js` to test tools in isolation:
+
+```javascript
+#!/usr/bin/env node
+
+const analyzeGitTool = require('./tools/analyze-git');
+const generateScriptTool = require('./tools/generate-script');
+const explainRemediationTool = require('./tools/explain-remediation');
+
+async function testTools() {
+  console.log('Testing MCP Tools Directly\n');
+
+  // Test 1: Generate Script
+  console.log('1. Testing generate_analysis_script...');
+  try {
+    const result = await generateScriptTool.execute({ scriptType: 'bash' });
+    console.log('✅ Success');
+    console.log(`   Script length: ${result.content[0].text.length}\n`);
+  } catch (error) {
+    console.log('❌ Failed:', error.message, '\n');
+  }
+
+  // Test 2: Explain Remediation
+  console.log('2. Testing explain_remediation...');
+  try {
+    const result = await explainRemediationTool.execute({
+      category: 'Session State',
+    });
+    console.log('✅ Success');
+    console.log(`   Output preview: ${result.content[0].text.substring(0, 80)}...\n`);
+  } catch (error) {
+    console.log('❌ Failed:', error.message, '\n');
+  }
+
+  // Test 3: Analyze Git (requires API)
+  console.log('3. Testing analyze_git_repository (requires API)...');
+  try {
+    const result = await analyzeGitTool.execute({
+      gitUrl: 'https://github.com/test/sample',
+    });
+    console.log('✅ Success');
+    console.log(`   Result: ${result.content[0].text.substring(0, 80)}...\n`);
+  } catch (error) {
+    console.log('⚠️  Expected if API not running:', error.message, '\n');
+  }
+
+  console.log('✅ Tool testing complete!');
+}
+
+testTools().catch(console.error);
+```
+
+**Run tool test:**
+
+```bash
+node test-tool.js
+```
+
+### Option 4: Test with curl (API Client Only)
+
+Test the API client directly:
+
+```javascript
+// test-api-client.js
+const apiClient = require('./utils/api-client');
+
+async function testAPIClient() {
+  console.log('Testing Statelessor API Client\n');
+
+  // Test 1: Generate Script
+  console.log('1. Testing generateScript...');
+  try {
+    const script = await apiClient.generateScript('bash');
+    console.log('✅ Success - Script length:', script.length, '\n');
+  } catch (error) {
+    console.log('❌ Failed:', error.message, '\n');
+  }
+
+  // Test 2: Analyze Git
+  console.log('2. Testing analyzeGitRepository...');
+  try {
+    const result = await apiClient.analyzeGitRepository(
+      'https://github.com/test/sample'
+    );
+    console.log('✅ Success - Project:', result.projectName, '\n');
+  } catch (error) {
+    console.log('❌ Failed:', error.message, '\n');
+  }
+
+  console.log('✅ API client testing complete!');
+}
+
+testAPIClient().catch(console.error);
+```
+
+**Run API client test:**
+
+```bash
+# Start Statelessor API first
+cd ../statelessor-api && node server.js &
+
+# Test API client
+cd statelessor-mcp
+node test-api-client.js
+```
+
+### Option 5: Test with Amazon Q Locally
+
+Configure Amazon Q to use your local MCP server:
+
+**1. Create MCP config file:**
+
+```bash
+mkdir -p ~/.aws/amazonq
+cat > ~/.aws/amazonq/mcp-config.json << EOF
+{
+  "mcpServers": {
+    "statelessor-local": {
+      "command": "node",
+      "args": ["/absolute/path/to/statelessor-mcp/mcp-server.js"],
+      "env": {
+        "STATELESSOR_API_URL": "http://localhost:3001"
+      }
+    }
+  }
+}
+EOF
+```
+
+**2. Start Statelessor API:**
+
+```bash
+cd ../statelessor-api
+node server.js
+```
+
+**3. Restart Amazon Q in your IDE**
+
+**4. Test in Amazon Q chat:**
+
+```
+You: Generate a bash script for analyzing .NET projects
+
+You: Explain how to fix Session State issues
+
+You: Analyze https://github.com/yourorg/test-repo
+```
+
+### Recommended Testing Workflow
+
+```bash
+# 1. Test API client first
+node test-api-client.js
+
+# 2. Test individual tools
+node test-tool.js
+
+# 3. Test full MCP server
+node test-manual.js
+
+# 4. Test with MCP Inspector (visual)
+mcp-inspector node mcp-server.js
+
+# 5. Test with Amazon Q (real usage)
+# Configure and restart Amazon Q
+
+# 6. Run automated tests
+npm test
+```
+
+### Troubleshooting Manual Tests
+
+**If tests fail:**
+
+1. **Check API is running:**
+   ```bash
+   curl http://localhost:3001/health
+   ```
+
+2. **Check environment variables:**
+   ```bash
+   echo $STATELESSOR_API_URL
+   ```
+
+3. **Enable debug logging:**
+   ```bash
+   DEBUG=* node test-manual.js
+   ```
+
+4. **Check file permissions:**
+   ```bash
+   ls -la tools/ utils/
+   ```
+
+5. **Verify dependencies:**
+   ```bash
+   npm list
+   ```e
+npm test -- --coverage
+
+# Run specific test
+npm test -- tests/tools/analyze-git.test.js
+```
+
 ### Phase 6: Deployment (Day 7-8)
 
 **Step 6.1: Create Dockerfile**
