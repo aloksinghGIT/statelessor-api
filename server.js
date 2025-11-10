@@ -375,6 +375,47 @@ async function cleanup(dir) {
   }
 }
 
+// Multer error handler middleware
+app.use((error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    logger.error('Multer error', error, { 
+      requestId: req.requestId,
+      field: error.field,
+      code: error.code 
+    });
+    
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({
+        success: false,
+        error: 'File too large. Maximum size is 100MB',
+        code: 'FILE_TOO_LARGE'
+      });
+    }
+    
+    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({
+        success: false,
+        error: `Unexpected field: ${error.field}. Expected field name is 'zipFile'`,
+        code: 'UNEXPECTED_FIELD'
+      });
+    }
+    
+    return res.status(400).json({
+      success: false,
+      error: error.message,
+      code: error.code
+    });
+  }
+  
+  // Handle other errors
+  logger.error('Unhandled error', error, { requestId: req.requestId });
+  res.status(500).json({
+    success: false,
+    error: 'Internal server error',
+    code: 'INTERNAL_ERROR'
+  });
+});
+
 app.listen(PORT, () => {
   logger.log(`Stateful Code Analyzer API running on port ${PORT}`);
 });

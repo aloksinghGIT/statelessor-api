@@ -224,37 +224,47 @@ class StatelessorMCPServer {
 
   setupToolHandlers() {
     // List available tools
-    this.server.setRequestHandler('tools/list', async () => {
-      return {
-        tools: [
-          analyzeGitTool.definition,
-          analyzeLocalTool.definition,
-          generateScriptTool.definition,
-          getFindingsTool.definition,
-          explainRemediationTool.definition,
-        ],
-      };
-    });
+    this.server.setRequestHandler(
+      {
+        method: 'tools/list',
+      },
+      async () => {
+        return {
+          tools: [
+            analyzeGitTool.definition,
+            analyzeLocalTool.definition,
+            generateScriptTool.definition,
+            getFindingsTool.definition,
+            explainRemediationTool.definition,
+          ],
+        };
+      }
+    );
 
     // Handle tool calls
-    this.server.setRequestHandler('tools/call', async (request) => {
-      const { name, arguments: args } = request.params;
+    this.server.setRequestHandler(
+      {
+        method: 'tools/call',
+      },
+      async (request) => {
+        const { name, arguments: args } = request.params;
 
-      switch (name) {
-        case 'analyze_git_repository':
-          return await analyzeGitTool.execute(args);
-        case 'analyze_local_project':
-          return await analyzeLocalTool.execute(args);
-        case 'generate_analysis_script':
-          return await generateScriptTool.execute(args);
-        case 'get_project_findings':
-          return await getFindingsTool.execute(args);
-        case 'explain_remediation':
-          return await explainRemediationTool.execute(args);
-        default:
-          throw new Error(`Unknown tool: ${name}`);
+        switch (name) {
+          case 'analyze_git_repository':
+            return await analyzeGitTool.execute(args);
+          case 'analyze_local_project':
+            return await analyzeLocalTool.execute(args);
+          case 'generate_analysis_script':
+            return await generateScriptTool.execute(args);
+          case 'get_project_findings':
+            return await getFindingsTool.execute(args);
+          case 'explain_remediation':
+            return await explainRemediationTool.execute(args);
+          default:
+            throw new Error(`Unknown tool: ${name}`);
+        }
       }
-    });
+    );
   }
 
   setupErrorHandling() {
@@ -1577,106 +1587,65 @@ npm test -- --coverage
 npm test -- tests/tools/analyze-git.test.js
 ```
 
-### Phase 6: Deployment (Day 7-8)
+### Phase 6: Publishing & User Documentation (Day 7-8)
 
-**Step 6.1: Create Dockerfile**
+> **Important:** MCP servers run locally on each user's machine, NOT deployed to cloud/containers. Only the Statelessor API is deployed (already done at https://statelessor-api.port2aws.pro).
 
-```dockerfile
-FROM node:20-alpine
+**Step 6.1: Prepare package.json for npm publishing**
 
-# Set working directory
-WORKDIR /app
+Update package.json with publishing metadata:
 
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy application files
-COPY . .
-
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
-
-USER nodejs
-
-# Expose stdio for MCP
-CMD ["node", "mcp-server.js"]
+```json
+{
+  "name": "statelessor-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Statelessor API - Analyze .NET/Java projects for stateful patterns via Amazon Q",
+  "main": "mcp-server.js",
+  "bin": {
+    "statelessor-mcp": "./mcp-server.js"
+  },
+  "scripts": {
+    "start": "node mcp-server.js",
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aloksinghGIT/statelessor-mcp.git"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "statelessor",
+    "amazon-q",
+    "code-analysis",
+    "stateful-patterns",
+    "dotnet",
+    "java",
+    "session-state"
+  ],
+  "author": "Alok Singh <mail.aloksingh@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/aloksinghGIT/statelessor-mcp/issues"
+  },
+  "homepage": "https://github.com/aloksinghGIT/statelessor-mcp#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "axios": "^1.6.0",
+    "archiver": "^6.0.0",
+    "form-data": "^4.0.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  }
+}
 ```
 
-**Step 6.2: Create docker-compose.yml**
-
-```yaml
-version: '3.8'
-
-services:
-  statelessor-mcp:
-    build: .
-    image: statelessor-mcp:latest
-    environment:
-      - STATELESSOR_API_URL=${STATELESSOR_API_URL:-http://localhost:3001}
-      - STATELESSOR_API_TIMEOUT=${STATELESSOR_API_TIMEOUT:-300000}
-    volumes:
-      - ./data:/app/data:ro
-    restart: unless-stopped
-```
-
-**Step 6.3: Create .env.example**
-
-```bash
-# Statelessor API Configuration
-STATELESSOR_API_URL=https://statelessor-api.port2aws.pro
-STATELESSOR_API_TIMEOUT=300000
-
-# MCP Server Configuration
-MCP_SERVER_NAME=statelessor
-MCP_SERVER_VERSION=1.0.0
-MCP_LOG_LEVEL=info
-
-# File Upload Limits
-MAX_PROJECT_SIZE_MB=100
-```
-
-**Step 6.4: Create deployment script (deploy.sh)**
-
-```bash
-#!/bin/bash
-
-set -e
-
-echo "Building Statelessor MCP Server..."
-
-# Build Docker image
-docker build -t statelessor-mcp:latest .
-
-# Tag for registry
-docker tag statelessor-mcp:latest your-registry/statelessor-mcp:latest
-
-# Push to registry
-echo "Pushing to registry..."
-docker push your-registry/statelessor-mcp:latest
-
-echo "Deployment complete!"
-```
-
-**Step 6.5: Create npm publish script**
-
-```bash
-# Update version
-npm version patch
-
-# Build (if needed)
-npm run build
-
-# Publish to npm
-npm publish --access public
-
-echo "Published to npm!"
-```
-
-**Step 6.6: Create .npmignore**
+**Step 6.2: Create .npmignore**
 
 ```
 tests/
@@ -1688,39 +1657,626 @@ node_modules/
 .DS_Store
 .vscode/
 .idea/
+*.test.js
+test-*.js
 ```
 
-**Step 6.7: Update package.json for publishing**
+**Step 6.3: Create README.md for npm**
+
+```markdown
+# Statelessor MCP Server
+
+MCP (Model Context Protocol) server for analyzing .NET and Java projects for stateful code patterns. Integrates with Amazon Q Developer.
+
+## Installation
+
+```bash
+npm install -g statelessor-mcp
+```
+
+## Quick Start
+
+### 1. Configure Amazon Q
+
+Create or edit `~/.aws/amazonq/mcp-config.json`:
 
 ```json
 {
-  "name": "statelessor-mcp",
-  "version": "1.0.0",
-  "description": "MCP server for Statelessor API integration with Amazon Q",
-  "main": "mcp-server.js",
-  "bin": {
-    "statelessor-mcp": "./mcp-server.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/yourorg/statelessor-mcp.git"
-  },
-  "keywords": [
-    "mcp",
-    "model-context-protocol",
-    "statelessor",
-    "amazon-q",
-    "code-analysis",
-    "stateful-patterns"
-  ],
-  "author": "Your Name <your.email@example.com>",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/yourorg/statelessor-mcp/issues"
-  },
-  "homepage": "https://github.com/yourorg/statelessor-mcp#readme"
+  "mcpServers": {
+    "statelessor": {
+      "command": "npx",
+      "args": ["statelessor-mcp"],
+      "env": {
+        "STATELESSOR_API_URL": "https://statelessor-api.port2aws.pro"
+      }
+    }
+  }
 }
 ```
+
+### 2. Restart Amazon Q in your IDE
+
+### 3. Use in Amazon Q Chat
+
+```
+You: Analyze my local project at /path/to/my-dotnet-app
+
+You: Analyze https://github.com/myorg/java-project
+
+You: Explain how to fix Session State issues
+
+You: Generate a bash script for analyzing .NET projects
+```
+
+## Available Tools
+
+- **analyze_git_repository** - Analyze Git repos for stateful patterns
+- **analyze_local_project** - Analyze local project directories
+- **generate_analysis_script** - Generate bash/PowerShell scripts
+- **get_project_findings** - Retrieve historical findings
+- **explain_remediation** - Get remediation guidance
+
+## Configuration
+
+Environment variables:
+
+- `STATELESSOR_API_URL` - API endpoint (default: http://localhost:3001)
+- `STATELESSOR_API_TIMEOUT` - Request timeout in ms (default: 300000)
+
+## License
+
+MIT
+
+
+**Step 6.4: Publish to npm**
+
+```bash
+# Login to npm (first time only)
+npm login
+
+# Test package locally
+npm pack
+npm install -g ./statelessor-mcp-1.0.0.tgz
+
+# Publish to npm
+npm publish --access public
+
+# Verify publication
+npm view statelessor-mcp
+```
+
+**Step 6.5: Create USER_GUIDE.md**
+
+```markdown
+# Statelessor MCP Server - User Guide
+
+## What is This?
+
+Statelessor MCP Server connects Amazon Q Developer to the Statelessor API for analyzing .NET and Java projects for stateful code patterns that prevent cloud migration.
+
+## Installation
+
+### Option 1: Install from npm (Recommended)
+
+```bash
+npm install -g statelessor-mcp
+```
+
+### Option 2: Install from source
+
+```bash
+git clone https://github.com/yourorg/statelessor-mcp.git
+cd statelessor-mcp
+npm install
+npm link
+```
+
+## Amazon Q Configuration
+
+### Step 1: Create MCP Configuration File
+
+**macOS/Linux:**
+```bash
+mkdir -p ~/.aws/amazonq
+cat > ~/.aws/amazonq/mcp-config.json << 'EOF'
+{
+  "mcpServers": {
+    "statelessor": {
+      "command": "npx",
+      "args": ["statelessor-mcp"],
+      "env": {
+        "STATELESSOR_API_URL": "https://statelessor-api.port2aws.pro"
+      }
+    }
+  }
+}
+EOF
+```
+
+**Windows (PowerShell):**
+```powershell
+$configPath = "$env:USERPROFILE\.aws\amazonq"
+New-Item -ItemType Directory -Force -Path $configPath
+
+@'
+{
+  "mcpServers": {
+    "statelessor": {
+      "command": "npx",
+      "args": ["statelessor-mcp"],
+      "env": {
+        "STATELESSOR_API_URL": "https://statelessor-api.port2aws.pro"
+      }
+    }
+  }
+}
+'@ | Out-File -FilePath "$configPath\mcp-config.json" -Encoding UTF8
+```
+
+### Step 2: Restart Amazon Q
+
+- **VS Code:** Reload window (Cmd/Ctrl + Shift + P → "Reload Window")
+- **JetBrains IDEs:** Restart IDE
+
+### Step 3: Verify Connection
+
+In Amazon Q chat:
+```
+You: List available MCP tools
+```
+
+You should see 5 Statelessor tools listed.
+
+## Usage Examples
+
+### Analyze Local Project
+
+```
+You: Analyze my local .NET project at /Users/john/projects/my-app
+```
+
+### Analyze Git Repository
+
+```
+You: Analyze the Git repository https://github.com/myorg/legacy-app
+```
+
+### Get Remediation Guidance
+
+```
+You: Explain how to fix Session State issues in .NET
+
+You: How do I remediate Static Mutable Fields in Java?
+```
+
+### Generate Analysis Script
+
+```
+You: Generate a bash script for analyzing .NET projects
+
+You: Create a PowerShell script for Java analysis
+```
+
+### Retrieve Historical Findings
+
+```
+You: Get findings for project "my-legacy-app"
+```
+
+## Troubleshooting
+
+### MCP Server Not Found
+
+**Error:** "Command not found: statelessor-mcp"
+
+**Solution:**
+```bash
+# Verify installation
+npm list -g statelessor-mcp
+
+# Reinstall if needed
+npm install -g statelessor-mcp
+```
+
+### API Connection Failed
+
+**Error:** "ECONNREFUSED" or "API timeout"
+
+**Solution:**
+1. Check API URL in mcp-config.json
+2. Verify API is accessible:
+   ```bash
+   curl https://statelessor-api.port2aws.pro/health
+   ```
+3. Check firewall/proxy settings
+
+### Amazon Q Not Detecting MCP Server
+
+**Solution:**
+1. Verify config file location:
+   ```bash
+   cat ~/.aws/amazonq/mcp-config.json
+   ```
+2. Check JSON syntax (use jsonlint.com)
+3. Restart IDE completely
+4. Check Amazon Q extension logs
+
+### File Upload Errors
+
+**Error:** "File too large" or "Upload failed"
+
+**Solution:**
+- Maximum project size: 100MB
+- Exclude node_modules, bin, obj folders
+- Check project directory permissions
+
+## Advanced Configuration
+
+### Custom API Endpoint
+
+For local development or custom deployments:
+
+```json
+{
+  "mcpServers": {
+    "statelessor": {
+      "command": "npx",
+      "args": ["statelessor-mcp"],
+      "env": {
+        "STATELESSOR_API_URL": "http://localhost:3001",
+        "STATELESSOR_API_TIMEOUT": "600000"
+      }
+    }
+  }
+}
+```
+
+### Using Local Development Version
+
+```json
+{
+  "mcpServers": {
+    "statelessor-dev": {
+      "command": "node",
+      "args": ["/absolute/path/to/statelessor-mcp/mcp-server.js"],
+      "env": {
+        "STATELESSOR_API_URL": "http://localhost:3001"
+      }
+    }
+  }
+}
+```
+
+## Support
+
+- **Issues:** https://github.com/yourorg/statelessor-mcp/issues
+- **Documentation:** https://github.com/yourorg/statelessor-mcp
+- **API Status:** https://statelessor-api.port2aws.pro/health
+```
+
+**Step 6.6: Create INTEGRATION_GUIDE.md**
+
+```markdown
+# Amazon Q Integration Guide
+
+## Overview
+
+This guide explains how the Statelessor MCP Server integrates with Amazon Q Developer.
+
+## Architecture
+
+```
+┌─────────────────┐
+│   Amazon Q      │
+│   (IDE Plugin)  │
+└────────┬────────┘
+         │ stdio (local process)
+         ▼
+┌─────────────────┐
+│ Statelessor MCP │
+│ Server (Local)  │
+└────────┬────────┘
+         │ HTTPS
+         ▼
+┌─────────────────┐
+│ Statelessor API │
+│ (AWS EC2)       │
+└─────────────────┘
+```
+
+## How It Works
+
+1. **User asks question in Amazon Q**
+   - Example: "Analyze my .NET project at /path/to/app"
+
+2. **Amazon Q spawns MCP server locally**
+   - Runs as child process using stdio transport
+   - Uses configuration from ~/.aws/amazonq/mcp-config.json
+
+3. **MCP server processes request**
+   - Validates input parameters
+   - Zips project files (for local analysis)
+   - Calls Statelessor API via HTTPS
+
+4. **API analyzes code**
+   - Scans for stateful patterns
+   - Generates findings and recommendations
+
+5. **Results returned to Amazon Q**
+   - MCP server formats results
+   - Amazon Q displays in chat
+
+## MCP Configuration Format
+
+```json
+{
+  "mcpServers": {
+    "<server-name>": {
+      "command": "<executable>",
+      "args": ["<arg1>", "<arg2>"],
+      "env": {
+        "<ENV_VAR>": "<value>"
+      }
+    }
+  }
+}
+```
+
+### Statelessor Configuration
+
+```json
+{
+  "mcpServers": {
+    "statelessor": {
+      "command": "npx",
+      "args": ["statelessor-mcp"],
+      "env": {
+        "STATELESSOR_API_URL": "https://statelessor-api.port2aws.pro"
+      }
+    }
+  }
+}
+```
+
+**Fields:**
+- `command`: Executable to run (npx, node, or absolute path)
+- `args`: Command arguments (package name or script path)
+- `env`: Environment variables passed to MCP server
+
+## Available Tools
+
+### 1. analyze_git_repository
+
+**Purpose:** Analyze Git repositories for stateful patterns
+
+**Input:**
+```json
+{
+  "gitUrl": "https://github.com/org/repo",
+  "sshKeyId": "optional-ssh-key-id"
+}
+```
+
+**Example:**
+```
+You: Analyze https://github.com/myorg/legacy-dotnet-app
+```
+
+### 2. analyze_local_project
+
+**Purpose:** Analyze local project directories
+
+**Input:**
+```json
+{
+  "projectPath": "/absolute/path/to/project"
+}
+```
+
+**Example:**
+```
+You: Analyze my local project at /Users/john/code/my-app
+```
+
+### 3. generate_analysis_script
+
+**Purpose:** Generate bash or PowerShell scripts for offline analysis
+
+**Input:**
+```json
+{
+  "scriptType": "bash" | "powershell"
+}
+```
+
+**Example:**
+```
+You: Generate a bash script for analyzing .NET projects
+```
+
+### 4. get_project_findings
+
+**Purpose:** Retrieve historical analysis findings
+
+**Input:**
+```json
+{
+  "projectName": "my-project"
+}
+```
+
+**Example:**
+```
+You: Get findings for project "legacy-app"
+```
+
+### 5. explain_remediation
+
+**Purpose:** Get detailed remediation guidance
+
+**Input:**
+```json
+{
+  "category": "Session State" | "Static Mutable Field" | etc.
+}
+```
+
+**Example:**
+```
+You: Explain how to fix Session State issues
+```
+
+## Testing Integration
+
+### 1. Verify MCP Server Installation
+
+```bash
+# Check if installed
+which statelessor-mcp
+
+# Test manually
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | npx statelessor-mcp
+```
+
+### 2. Verify Amazon Q Configuration
+
+```bash
+# Check config file exists
+cat ~/.aws/amazonq/mcp-config.json
+
+# Validate JSON syntax
+python -m json.tool ~/.aws/amazonq/mcp-config.json
+```
+
+### 3. Test in Amazon Q
+
+```
+You: List available MCP tools
+```
+
+Expected: Should see 5 Statelessor tools
+
+### 4. Test Tool Execution
+
+```
+You: Generate a bash script for analyzing .NET projects
+```
+
+Expected: Should receive a bash script with instructions
+
+## Debugging
+
+### Enable MCP Debug Logging
+
+Add to mcp-config.json:
+
+```json
+{
+  "mcpServers": {
+    "statelessor": {
+      "command": "npx",
+      "args": ["statelessor-mcp"],
+      "env": {
+        "STATELESSOR_API_URL": "https://statelessor-api.port2aws.pro",
+        "DEBUG": "*"
+      }
+    }
+  }
+}
+```
+
+### Check Amazon Q Logs
+
+**VS Code:**
+- Output panel → Amazon Q Language Server
+
+**JetBrains:**
+- Help → Show Log in Finder/Explorer
+
+### Test MCP Server Directly
+
+```bash
+# Test with MCP Inspector
+npx @modelcontextprotocol/inspector npx statelessor-mcp
+
+# Test with manual input
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | \
+  STATELESSOR_API_URL=https://statelessor-api.port2aws.pro \
+  npx statelessor-mcp
+```
+
+## Security Considerations
+
+1. **MCP server runs locally** - Has access to local filesystem
+2. **API communication** - Uses HTTPS to deployed API
+3. **No credentials stored** - API is public (consider adding auth)
+4. **File uploads** - Limited to 100MB, temporary files cleaned up
+5. **Git repositories** - Cloned temporarily, deleted after analysis
+
+## Best Practices
+
+1. **Use npx for command** - Ensures latest version
+2. **Set explicit API URL** - Don't rely on defaults
+3. **Test configuration** - Verify before distributing to users
+4. **Monitor API usage** - Track requests and errors
+5. **Update regularly** - Keep MCP server package updated
+
+## Distribution to Users
+
+### Internal Distribution
+
+**Email template:**
+
+```
+Subject: Statelessor Analysis Now Available in Amazon Q
+
+Hi team,
+
+You can now analyze .NET and Java projects for stateful patterns directly in Amazon Q!
+
+Setup (5 minutes):
+
+1. Install MCP server:
+   npm install -g statelessor-mcp
+
+2. Configure Amazon Q:
+   Create ~/.aws/amazonq/mcp-config.json with:
+   {
+     "mcpServers": {
+       "statelessor": {
+         "command": "npx",
+         "args": ["statelessor-mcp"],
+         "env": {
+           "STATELESSOR_API_URL": "https://statelessor-api.port2aws.pro"
+         }
+       }
+     }
+   }
+
+3. Restart your IDE
+
+4. Try it:
+   "Analyze my local project at /path/to/my-app"
+
+Full guide: [link to USER_GUIDE.md]
+
+Questions? Reply to this email or file an issue.
+```
+
+### Public Distribution
+
+1. Publish to npm (already done in Step 6.4)
+2. Add README.md to GitHub
+3. Create GitHub releases
+4. Add to MCP servers directory (if available)
+5. Write blog post or documentation
+
+## Support
+
+- **GitHub Issues:** https://github.com/yourorg/statelessor-mcp/issues
+- **API Health:** https://statelessor-api.port2aws.pro/health
+- **MCP Protocol:** https://modelcontextprotocol.io
+
 
 ## MCP Tools Specification
 
@@ -1897,7 +2453,7 @@ Users configure the MCP server in their Amazon Q settings:
       "command": "node",
       "args": ["/usr/local/bin/statelessor-mcp"],
       "env": {
-        "STATELESSOR_API_URL": "https://statelessor-api.company.com"
+        "STATELESSOR_API_URL": "https://statelessor-api.port2aws.pro"
       }
     }
   }
